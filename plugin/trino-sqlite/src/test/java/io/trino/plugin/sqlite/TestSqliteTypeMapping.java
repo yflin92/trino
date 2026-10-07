@@ -19,6 +19,8 @@ import io.trino.testing.AbstractTestQueryFramework;
 import io.trino.testing.QueryRunner;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 final class TestSqliteTypeMapping
@@ -57,7 +59,18 @@ final class TestSqliteTypeMapping
         sqlite.execute("CREATE VIEW active_readings AS SELECT id, sensor, reading * 2 AS doubled FROM \"Readings\" WHERE active");
         sqlite.execute("CREATE TABLE with_sequence (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)");
         sqlite.execute("INSERT INTO with_sequence (name) VALUES ('x')");
-        return SqliteQueryRunner.builder(sqlite).build();
+        sqlite.execute("CREATE TABLE collated (id INTEGER, nocase TEXT COLLATE NOCASE, rtrim TEXT COLLATE RTRIM)");
+        sqlite.execute("INSERT INTO collated VALUES (1, 'a', 'x'), (2, 'A', 'x  '), (3, 'b', 'y'), (4, 'B', NULL)");
+        sqlite.execute("CREATE TABLE numbers (n INTEGER)");
+        sqlite.execute("INSERT INTO numbers VALUES (9), (10), (100)");
+        sqlite.execute("CREATE TABLE bad_dates (day DATE)");
+        sqlite.execute("INSERT INTO bad_dates VALUES ('2024/01/15')");
+
+        QueryRunner queryRunner = SqliteQueryRunner.builder(sqlite).build();
+        queryRunner.createCatalog("sqlite_forced_varchar", "sqlite", Map.of(
+                "connection-url", sqlite.getJdbcUrl(),
+                "jdbc-types-mapped-to-varchar", "INTEGER"));
+        return queryRunner;
     }
 
     @Test
@@ -103,7 +116,7 @@ final class TestSqliteTypeMapping
     {
         assertThat(query("SHOW TABLES"))
                 .skippingTypesCheck()
-                .matches("VALUES 'active_readings', 'readings', 'with_sequence'");
+                .matches("VALUES 'active_readings', 'bad_dates', 'collated', 'numbers', 'readings', 'with_sequence'");
         assertThat(query("SHOW SCHEMAS"))
                 .skippingTypesCheck()
                 .matches("VALUES 'information_schema', 'main'");
@@ -141,6 +154,64 @@ final class TestSqliteTypeMapping
                 .matches("VALUES BIGINT '1', BIGINT '9007199254740993'")
                 .isFullyPushedDown();
         assertThat(query("SELECT id FROM readings ORDER BY anything LIMIT 1"))
+                .isNotFullyPushedDown(TopNNode.class);
+    }
+
+    @Test
+    void testPushdownIgnoresDeclaredCollation()
+    {
+        assertThat(query("SELECT id FROM collated WHERE nocase = 'a'"))
+                .matches("VALUES BIGINT '1'")
+                .isFullyPushedDown();
+        assertThat(query("SELECT id FROM collated WHERE nocase IN ('a', 'b')"))
+                .matches("VALUES BIGINT '1', BIGINT '3'")
+                .isFullyPushedDown();
+        assertThat(query("SELECT id FROM collated WHERE nocase IN ('A', 'B') OR nocase > 'a'"))
+                .matches("VALUES BIGINT '2', BIGINT '3', BIGINT '4'")
+                .isFullyPushedDown();
+        assertThat(query("SELECT id FROM collated WHERE nocase NOT IN ('a', 'b')"))
+                .matches("VALUES BIGINT '2', BIGINT '4'")
+                .isFullyPushedDown();
+        assertThat(query("SELECT id FROM collated WHERE nocase < 'a'"))
+                .matches("VALUES BIGINT '2', BIGINT '4'")
+                .isFullyPushedDown();
+        assertThat(query("SELECT id FROM collated WHERE rtrim = 'x'"))
+                .matches("VALUES BIGINT '1'")
+                .isFullyPushedDown();
+        // BINARY collation sorts upper case letters before lower case letters
+        assertThat(query("SELECT nocase FROM collated ORDER BY nocase LIMIT 3"))
+                .ordered()
+                .matches("VALUES VARCHAR 'A', VARCHAR 'B', VARCHAR 'a'")
+                .isFullyPushedDown();
+    }
+
+    @Test
+    void testDatesOutsideSupportedRange()
+    {
+        assertThat(query("CREATE TABLE out_of_range AS SELECT DATE '10000-01-01' day"))
+                .failure().hasMessage("Date must be between 0000-01-01 and 9999-12-31 in SQLite: +10000-01-01");
+        assertThat(query("CREATE TABLE out_of_range AS SELECT DATE '-0001-01-01' day"))
+                .failure().hasMessage("Date must be between 0000-01-01 and 9999-12-31 in SQLite: -0001-01-01");
+
+        // Bounds outside the supported range do not have the same text format as stored dates, so Trino filters the rows
+        assertThat(query("SELECT id FROM readings WHERE day < DATE '10000-01-01'"))
+                .matches("VALUES BIGINT '1', BIGINT '2'")
+                .isNotFullyPushedDown(FilterNode.class);
+        assertThat(query("SELECT id FROM readings WHERE day > DATE '-0001-01-01'"))
+                .matches("VALUES BIGINT '1', BIGINT '2'")
+                .isNotFullyPushedDown(FilterNode.class);
+
+        assertThat(query("SELECT * FROM bad_dates"))
+                .failure().hasMessage("Date value is not in YYYY-MM-DD format: 2024/01/15");
+    }
+
+    @Test
+    void testTopNOnColumnMappedToVarchar()
+    {
+        // SQLite sorts the INTEGER values numerically, but Trino sorts the mapped varchar values as text
+        assertThat(query("SELECT n FROM sqlite_forced_varchar.main.numbers ORDER BY n LIMIT 2"))
+                .ordered()
+                .matches("VALUES VARCHAR '10', VARCHAR '100'")
                 .isNotFullyPushedDown(TopNNode.class);
     }
 

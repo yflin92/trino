@@ -67,6 +67,7 @@ final class TestSqliteConnectorTest
                  SUPPORTS_JOIN_PUSHDOWN,
                  SUPPORTS_MAP_TYPE,
                  SUPPORTS_MERGE,
+                 SUPPORTS_NEGATIVE_DATE,
                  SUPPORTS_PREDICATE_ARITHMETIC_EXPRESSION_PUSHDOWN,
                  SUPPORTS_RENAME_TABLE_ACROSS_SCHEMAS,
                  SUPPORTS_ROW_LEVEL_UPDATE,
@@ -152,6 +153,18 @@ final class TestSqliteConnectorTest
                         "col_default INTEGER DEFAULT 43," +
                         "col_nonnull_default INTEGER DEFAULT 42 NOT NULL," +
                         "col_required2 INTEGER NOT NULL)");
+    }
+
+    @Override
+    protected String errorMessageForCreateTableAsSelectNegativeDate(String date)
+    {
+        return "Date must be between 0000-01-01 and 9999-12-31 in SQLite: " + date;
+    }
+
+    @Override
+    protected String errorMessageForInsertNegativeDate(String date)
+    {
+        return "Date must be between 0000-01-01 and 9999-12-31 in SQLite: " + date;
     }
 
     @Override

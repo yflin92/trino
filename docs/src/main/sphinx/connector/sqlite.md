@@ -75,7 +75,8 @@ rules to determine affinity, applied in the order of this table:
   -
 * - `DATE`
   - `DATE`
-  - Values must be stored as text in `YYYY-MM-DD` format.
+  - Values must be stored as text in `YYYY-MM-DD` format, with a year
+    between 0000 and 9999.
 * - `DECIMAL(p, s)` or `NUMERIC(p, s)` with `p` up to 15
   - `DECIMAL(p, s)`
   - SQLite stores decimal values as floating point numbers.
@@ -117,7 +118,8 @@ The connector maps Trino types to SQLite types following this table:
   -
 * - `DATE`
   - `DATE`
-  - Stored as text in `YYYY-MM-DD` format.
+  - Stored as text in `YYYY-MM-DD` format. Dates must be between
+    `0000-01-01` and `9999-12-31`.
 :::
 
 No other types are supported.
@@ -208,8 +210,8 @@ The connector supports pushdown for a number of operations:
 - {ref}`topn-pushdown`
 
 Predicates are pushed down for all columns except columns that are mapped
-to `VARCHAR` from types without a text affinity. Predicates and sorting on
-text columns are pushed down assuming that the column uses the default
-`BINARY` collation, which compares text the same way as Trino. Columns
-declared with a different collation, such as `COLLATE NOCASE`, can return
-different results.
+to `VARCHAR` from types without a text affinity, or with the
+`jdbc-types-mapped-to-varchar` catalog property. Predicates and sorting on text
+columns are pushed down with the `BINARY` collation, which compares text the
+same way as Trino, also for columns declared with a different collation such as
+`COLLATE NOCASE`.

@@ -25,6 +25,7 @@ import io.trino.plugin.jdbc.JdbcSortItem;
 import io.trino.plugin.jdbc.JdbcTableHandle;
 import io.trino.plugin.jdbc.JdbcTypeHandle;
 import io.trino.plugin.jdbc.LongWriteFunction;
+import io.trino.plugin.jdbc.PredicatePushdownController;
 import io.trino.plugin.jdbc.QueryBuilder;
 import io.trino.plugin.jdbc.RemoteTableName;
 import io.trino.plugin.jdbc.WriteMapping;
@@ -33,6 +34,7 @@ import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ColumnPosition;
 import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.predicate.Range;
 import io.trino.spi.type.CharType;
 import io.trino.spi.type.DecimalType;
 import io.trino.spi.type.Type;
@@ -55,6 +57,7 @@ import java.util.regex.Pattern;
 
 import static io.trino.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
 import static io.trino.plugin.jdbc.PredicatePushdownController.DISABLE_PUSHDOWN;
+import static io.trino.plugin.jdbc.PredicatePushdownController.FULL_PUSHDOWN;
 import static io.trino.plugin.jdbc.StandardColumnMappings.bigintColumnMapping;
 import static io.trino.plugin.jdbc.StandardColumnMappings.bigintWriteFunction;
 import static io.trino.plugin.jdbc.StandardColumnMappings.booleanColumnMapping;
@@ -73,6 +76,7 @@ import static io.trino.plugin.jdbc.StandardColumnMappings.varbinaryWriteFunction
 import static io.trino.plugin.jdbc.StandardColumnMappings.varcharColumnMapping;
 import static io.trino.plugin.jdbc.StandardColumnMappings.varcharReadFunction;
 import static io.trino.plugin.jdbc.StandardColumnMappings.varcharWriteFunction;
+import static io.trino.spi.StandardErrorCode.INVALID_ARGUMENTS;
 import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.trino.spi.type.BigintType.BIGINT;
 import static io.trino.spi.type.BooleanType.BOOLEAN;
@@ -104,8 +108,29 @@ public final class SqliteClient
     // SQLite has no schemas, so the database file is exposed as its built-in "main" schema
     public static final String MAIN_SCHEMA = "main";
 
+    // The default collation, which compares text with memcmp, the same way as Trino
+    static final String BINARY_COLLATION = "BINARY";
+
     // SQLite stores decimal values as 8-byte floating point numbers, which represent at most 15 significant digits exactly
     private static final int MAX_DECIMAL_PRECISION = 15;
+
+    // Dates are stored as YYYY-MM-DD text, which sorts in the same order as the dates only for years with 4 digits
+    private static final LocalDate MIN_DATE = LocalDate.of(0, 1, 1);
+    private static final LocalDate MAX_DATE = LocalDate.of(9999, 12, 31);
+    private static final Pattern DATE_PATTERN = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
+
+    // Range predicates are pushed down only when their bounds have the same YYYY-MM-DD text format as stored dates
+    private static final PredicatePushdownController DATE_PUSHDOWN = (session, domain) -> {
+        if (domain.getValues().isNone() || domain.getValues().isAll()) {
+            return FULL_PUSHDOWN.apply(session, domain);
+        }
+        Range span = domain.getValues().getRanges().getSpan();
+        if ((!span.isLowUnbounded() && !isSupportedDate((long) span.getLowBoundedValue())) ||
+                (!span.isHighUnbounded() && !isSupportedDate((long) span.getHighBoundedValue()))) {
+            return DISABLE_PUSHDOWN.apply(session, domain);
+        }
+        return FULL_PUSHDOWN.apply(session, domain);
+    };
 
     private static final Pattern DECLARED_TYPE_PATTERN = Pattern.compile("(?<name>[^(]*?)\\s*(?:\\(\\s*(?<precision>\\d+)\\s*(?:,\\s*(?<scale>\\d+)\\s*)?\\))?");
 
@@ -266,8 +291,11 @@ public final class SqliteClient
     @Override
     public boolean supportsTopN(ConnectorSession session, JdbcTableHandle handle, List<JdbcSortItem> sortOrder)
     {
-        // Values of columns without a single mapped type sort differently in SQLite, for example numbers before text
-        return sortOrder.stream().allMatch(sortItem -> classify(sortItem.column().getJdbcTypeHandle()) != SqliteType.ANY);
+        // Values of columns without a single mapped type, or mapped to varchar by configuration, sort differently in SQLite.
+        // For example, SQLite sorts numbers before text, and 9 before 10.
+        return sortOrder.stream()
+                .map(sortItem -> sortItem.column().getJdbcTypeHandle())
+                .allMatch(typeHandle -> classify(typeHandle) != SqliteType.ANY && getForcedMappingToVarchar(typeHandle).isEmpty());
     }
 
     @Override
@@ -276,8 +304,9 @@ public final class SqliteClient
         return Optional.of((query, sortItems, limit) -> {
             String orderBy = sortItems.stream()
                     .map(sortItem -> format(
-                            "%s %s NULLS %s",
+                            "%s%s %s NULLS %s",
                             quoted(sortItem.column().getColumnName()),
+                            isText(sortItem.column().getJdbcTypeHandle()) ? " COLLATE " + BINARY_COLLATION : "",
                             sortItem.sortOrder().isAscending() ? "ASC" : "DESC",
                             sortItem.sortOrder().isNullsFirst() ? "FIRST" : "LAST"))
                     .collect(joining(", "));
@@ -300,7 +329,7 @@ public final class SqliteClient
         }
         return Optional.of(switch (classify(typeHandle)) {
             case INTEGER -> bigintColumnMapping();
-            // Text is compared with the BINARY collation by default, which matches Trino's ordering of varchar values
+            // Pushed down predicates and sorting compare text with the BINARY collation, see SqliteQueryBuilder
             case TEXT -> varcharColumnMapping(VARCHAR, true);
             case BLOB -> varbinaryColumnMapping();
             case REAL -> doubleColumnMapping();
@@ -353,6 +382,11 @@ public final class SqliteClient
             return WriteMapping.longMapping("DATE", dateWriteFunction());
         }
         throw new TrinoException(NOT_SUPPORTED, "Unsupported column type: " + type.getDisplayName());
+    }
+
+    static boolean isText(JdbcTypeHandle typeHandle)
+    {
+        return classify(typeHandle) == SqliteType.TEXT;
     }
 
     private enum SqliteType
@@ -416,23 +450,37 @@ public final class SqliteClient
 
     private static ColumnMapping dateColumnMapping()
     {
-        // SQLite has no date storage class. Dates are stored as ISO-8601 text, whose ordering matches the ordering of dates.
+        // SQLite has no date storage class, so dates are stored as text
         return ColumnMapping.longMapping(
                 DATE,
                 (resultSet, columnIndex) -> {
                     String value = resultSet.getString(columnIndex);
                     try {
-                        return LocalDate.parse(value).toEpochDay();
+                        if (DATE_PATTERN.matcher(value).matches()) {
+                            return LocalDate.parse(value).toEpochDay();
+                        }
                     }
-                    catch (DateTimeParseException e) {
-                        throw new TrinoException(JDBC_ERROR, "Date value is not in YYYY-MM-DD format: " + value, e);
+                    catch (DateTimeParseException _) {
+                        // Reported below
                     }
+                    throw new TrinoException(JDBC_ERROR, "Date value is not in YYYY-MM-DD format: " + value);
                 },
-                dateWriteFunction());
+                dateWriteFunction(),
+                DATE_PUSHDOWN);
     }
 
     private static LongWriteFunction dateWriteFunction()
     {
-        return LongWriteFunction.of(Types.VARCHAR, (statement, index, day) -> statement.setString(index, LocalDate.ofEpochDay(day).toString()));
+        return LongWriteFunction.of(Types.VARCHAR, (statement, index, day) -> {
+            if (!isSupportedDate(day)) {
+                throw new TrinoException(INVALID_ARGUMENTS, format("Date must be between %s and %s in SQLite: %s", MIN_DATE, MAX_DATE, LocalDate.ofEpochDay(day)));
+            }
+            statement.setString(index, LocalDate.ofEpochDay(day).toString());
+        });
+    }
+
+    private static boolean isSupportedDate(long day)
+    {
+        return day >= MIN_DATE.toEpochDay() && day <= MAX_DATE.toEpochDay();
     }
 }

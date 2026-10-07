@@ -25,12 +25,14 @@ import io.trino.plugin.jdbc.DriverConnectionFactory;
 import io.trino.plugin.jdbc.ForBaseJdbc;
 import io.trino.plugin.jdbc.JdbcClient;
 import io.trino.plugin.jdbc.JdbcWriteConfig;
+import io.trino.plugin.jdbc.QueryBuilder;
 import io.trino.plugin.jdbc.credential.CredentialProvider;
 import io.trino.plugin.jdbc.ptf.Query;
 import io.trino.spi.function.table.ConnectorTableFunction;
 import org.sqlite.JDBC;
 
 import static com.google.inject.multibindings.Multibinder.newSetBinder;
+import static com.google.inject.multibindings.OptionalBinder.newOptionalBinder;
 import static io.airlift.configuration.ConfigBinder.configBinder;
 
 public final class SqliteClientModule
@@ -39,6 +41,7 @@ public final class SqliteClientModule
     @Override
     protected void setup(Binder binder)
     {
+        newOptionalBinder(binder, QueryBuilder.class).setBinding().to(SqliteQueryBuilder.class).in(Scopes.SINGLETON);
         binder.bind(JdbcClient.class).annotatedWith(ForBaseJdbc.class).to(SqliteClient.class).in(Scopes.SINGLETON);
         // SQLite allows a single writer per database at a time
         configBinder(binder).bindConfigDefaults(JdbcWriteConfig.class, config -> config.setWriteParallelism(1));
