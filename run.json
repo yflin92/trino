@@ -42,7 +42,7 @@
     "unsupported_type_handling": "IGNORE",
     "domain_compaction_threshold": "256"
   },
-  "status": "hunting",
+  "status": "triage (started on 5/6 branches; concurrency pending)",
   "parent_task_id": "875e5b37fa222f127c081367",
   "areas": {
     "filter": {
@@ -82,7 +82,7 @@
       "findings_branch": "cs_2Rx8KFE7F4/fleet-sqlite-20261008-1731-findings-concurrency-transactions"
     }
   },
-  "triage_session_id": null,
+  "triage_session_id": "cs_yBHttdXmo0",
   "channel": "git-branch (yflin92/trino); /agentfs is NOT shared across sessions",
   "control_branch": "fleet/sqlite-20261008-1731/control",
   "findings_branch_pattern": "fleet/sqlite-20261008-1731/findings/<area>",
@@ -92,5 +92,13 @@
   "notes": {
     "update_at": "2026-10-08T18:30Z",
     "observed": "all 6 hunters past setup and issuing real SQL against Trino 483; candidate found by metadata-passthrough (unicode case-collision wrong table); concurrency hunter notes UPDATE is NOT supported (contradicts ground-rules list)."
-  }
+  },
+  "delivered_findings_branches": {
+    "filter": "cs_LWoPgj_O4I/fleet-sqlite-20261008-1731-findings-filter",
+    "topn-limit": "cs_XbD4mb8lBB/fleet-sqlite-20261008-1731-findings-topn-limit",
+    "type-mapping-read": "cs_ifcWbz4SDA/fleet-sqlite-20261008-1731-findings-type-mapping-read",
+    "metadata-passthrough": "cs_lcgHi6H_JM/fleet-sqlite-20261008-1731-findings-metadata-passthrough",
+    "dml-write": "cs_33rTg0lj_r/fleet-sqlite-20261008-1731-findings-dml-write (clean)"
+  },
+  "candidate_count": 4
 }
