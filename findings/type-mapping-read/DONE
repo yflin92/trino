@@ -1,0 +1,24 @@
+type-mapping-read hunter — run sqlite-20261008-1731 — DONE
+
+Seed hypotheses tested and outcomes:
+- Affinity edge declared types (FLOATING POINT, CHARINT, STRING, DOUBLE PRECISION,
+  DECIMAL(16,2) p>15, BIGINT UNSIGNED, INT8, VARCHAR(10), empty type):
+  CONSISTENT with SQLite affinity + docs. No wrong rows.
+- INTEGER col holding REAL/TEXT/BLOB: CONSISTENT (truncates toward zero == SQLite
+  CAST; text/blob -> 0 per docs; huge reals saturate to Long.MAX/MIN == SQLite CAST).
+- REAL col holding big integer: CONSISTENT (double rounding).
+- DECIMAL read, float rounded HALF_UP (decimalColumnMapping): CONSISTENT — uses
+  driver shortest-repr getBigDecimal; matches bundled driver. Not a wrong row.
+- BOOLEAN col holding 2 / -1 / 0 / text: CONSISTENT with SQLite truthiness.
+- BOOLEAN col holding a FRACTIONAL REAL (|v|<1, e.g. 0.5): **WRONG ROWS** — reads
+  false, SQLite says true. FILED: boolean-real-fractional-misread.
+- Views with expression columns -> varchar: CONSISTENT with docs.
+- BLOB-in-TEXT / TEXT-in-BLOB / int-in-BLOB: CONSISTENT with SQLite CAST/hex.
+
+Out of scope (errors, noted in NOTES.md):
+- DECIMAL value exceeding declared precision -> SERIALIZATION_ERROR (not wrong rows).
+- DECIMAL(16,2)-as-varchar float text differs 3.45.1 vs 3.53.4 (engine version, not
+  a connector bug).
+
+Findings filed: 1
+  - boolean-real-fractional-misread  (WRONG ROWS, read)

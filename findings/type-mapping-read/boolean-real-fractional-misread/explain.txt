@@ -1,0 +1,14 @@
+"Query Plan"
+"Trino version: 483
+Fragment 0 [SOURCE]
+    Output layout: [flag]
+    Output partitioning: SINGLE []
+    Output[columnNames = [flag]]
+    │   Layout: [flag:boolean]
+    │   Estimates: {rows: ? (?), cpu: 0, memory: 0B, network: 0B}
+    └─ TableScan[table = boolf:main.t main.t]
+           Layout: [flag:boolean]
+           Estimates: {rows: ? (?), cpu: ?, memory: 0B, network: 0B}
+           flag := flag:boolean:BOOLEAN
+
+"
