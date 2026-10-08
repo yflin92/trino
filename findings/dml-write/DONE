@@ -1,0 +1,8 @@
+HUNTER dml-write — run sqlite-20261008-1731 — VERDICT: NO CONFIRMED BUGS
+
+Target: SQLite connector PR yflin92/trino#1 @ 7ce55e6b, plugin on trinodb/trino:483.
+Native sqlite3 3.45.1; driver bundled 3.53.4.
+
+All seed hypotheses probed. Every DML-write path tested produced CORRECT rows and
+CORRECT values versus the native A/B typeof oracle. No wrong-rows / wrong-values
+corruption found. Details in NOTES.md.
