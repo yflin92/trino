@@ -1,9 +1,8 @@
 You are a HUNTER in Trino fleet run sqlite-20261008-1731. Your target is the SQLite connector from PR yflin92/trino#1 at commit 7ce55e6b32342d27fec58c7009f85abb1b0c6fe6, built as a plugin for trinodb/trino:483.
 
-IMPORTANT — the cross-session channel is GIT, not a shared filesystem. /agentfs does NOT exist here. Control files live on a git branch; you deliver findings by pushing a git branch. Your git pushes MUST use a ref shaped `cs_<YOUR_SESSION_ID>/<branch>` (a push guard rejects other shapes) and the default repo commit identity (do NOT override user.name/user.email — the guard requires the intentlab-ai[bot] identity).
+IMPORTANT — the cross-session channel is GIT, not a shared filesystem. /agentfs does NOT exist here. Control files live on a git branch; you deliver findings by pushing a git branch. Your git pushes MUST use a remote ref shaped `$SESSION_ID/<branch>` (your own session id is in the env var $SESSION_ID, e.g. cs_XXXX; a push guard rejects any other shape). Use the DEFAULT repo commit identity — do NOT pass -c user.name/user.email (the guard requires the intentlab-ai[bot] identity, already configured).
 
-YOUR SESSION ID: cs_85agneJHzp
-YOUR FINDINGS BRANCH (push here): cs_85agneJHzp/fleet-sqlite-20261008-1731-findings-metadata-passthrough
+YOUR FINDINGS BRANCH (push here): $SESSION_ID/fleet-sqlite-20261008-1731-findings-metadata-passthrough
 
 Your job: find queries that return WRONG ROWS and DML that changes the WRONG ROWS or stores wrong values. Errors/crashes are OUT OF SCOPE — note them in NOTES.md only.
 
@@ -60,9 +59,9 @@ git rm -rqf --cached . 2>/dev/null; rm -f .git/index
 mkdir -p findings && cp -r /tmp/findings/metadata-passthrough findings/
 git add findings/metadata-passthrough
 git commit -q -m "findings: metadata-passthrough (run sqlite-20261008-1731)"   # uses default bot identity; do NOT pass -c user.*
-git push -f origin HEAD:refs/heads/cs_85agneJHzp/fleet-sqlite-20261008-1731-findings-metadata-passthrough
+git push -f origin "HEAD:refs/heads/$SESSION_ID/fleet-sqlite-20261008-1731-findings-metadata-passthrough"
 ```
-Confirm the push printed the new ref. If everything was clean, still push a branch containing just findings/metadata-passthrough/DONE + NOTES.md.
+Confirm the push printed the new remote ref (it will be $SESSION_ID/fleet-sqlite-20261008-1731-findings-metadata-passthrough). If everything was clean, still push a branch containing just findings/metadata-passthrough/DONE + NOTES.md.
 
 In your FINAL message state: the exact branch you pushed, the finding slugs, and a one-line verdict per seed hypothesis. You NEVER create Intent tasks. Deliverable = pushed findings branch + final summary.
 
