@@ -42,42 +42,42 @@
     "unsupported_type_handling": "IGNORE",
     "domain_compaction_threshold": "256"
   },
-  "status": "triage (started on 5/6 branches; concurrency pending)",
+  "status": "triage (all 6 hunter branches delivered)",
   "parent_task_id": "875e5b37fa222f127c081367",
   "areas": {
     "filter": {
       "session_id": "cs_LWoPgj_O4I",
-      "status": "hunting",
+      "status": "delivered",
       "dead_ephemeral_session": "cs_pzvkHSyCNa",
       "findings_branch": "cs_LWoPgj_O4I/fleet-sqlite-20261008-1731-findings-filter"
     },
     "topn-limit": {
       "session_id": "cs_XbD4mb8lBB",
-      "status": "hunting",
+      "status": "delivered",
       "dead_ephemeral_session": "cs__R66Y1doWP",
       "findings_branch": "cs_XbD4mb8lBB/fleet-sqlite-20261008-1731-findings-topn-limit"
     },
     "type-mapping-read": {
       "session_id": "cs_ifcWbz4SDA",
-      "status": "hunting",
+      "status": "delivered",
       "dead_ephemeral_session": "cs_Kgwvo4CXOy",
       "findings_branch": "cs_ifcWbz4SDA/fleet-sqlite-20261008-1731-findings-type-mapping-read"
     },
     "dml-write": {
       "session_id": "cs_33rTg0lj_r",
-      "status": "hunting",
+      "status": "delivered",
       "dead_ephemeral_session": "cs_OqjT6x0A-k",
       "findings_branch": "cs_33rTg0lj_r/fleet-sqlite-20261008-1731-findings-dml-write"
     },
     "metadata-passthrough": {
       "session_id": "cs_lcgHi6H_JM",
-      "status": "hunting",
+      "status": "delivered",
       "dead_ephemeral_session": "cs_85agneJHzp",
       "findings_branch": "cs_lcgHi6H_JM/fleet-sqlite-20261008-1731-findings-metadata-passthrough"
     },
     "concurrency-transactions": {
       "session_id": "cs_2Rx8KFE7F4",
-      "status": "hunting",
+      "status": "delivered",
       "dead_ephemeral_session": "cs_cAmGj63pSD",
       "findings_branch": "cs_2Rx8KFE7F4/fleet-sqlite-20261008-1731-findings-concurrency-transactions"
     }
@@ -98,7 +98,16 @@
     "topn-limit": "cs_XbD4mb8lBB/fleet-sqlite-20261008-1731-findings-topn-limit",
     "type-mapping-read": "cs_ifcWbz4SDA/fleet-sqlite-20261008-1731-findings-type-mapping-read",
     "metadata-passthrough": "cs_lcgHi6H_JM/fleet-sqlite-20261008-1731-findings-metadata-passthrough",
-    "dml-write": "cs_33rTg0lj_r/fleet-sqlite-20261008-1731-findings-dml-write (clean)"
+    "dml-write": "cs_33rTg0lj_r/fleet-sqlite-20261008-1731-findings-dml-write (clean)",
+    "concurrency-transactions": "cs_2Rx8KFE7F4/fleet-sqlite-20261008-1731-findings-concurrency-transactions"
   },
-  "candidate_count": 4
+  "candidate_count": 5,
+  "candidate_findings": {
+    "filter": "bool-pushdown-nonbinary-wrong-rows (wrong rows)",
+    "topn-limit": "topn-integer-affinity-text-value (wrong rows, Tier1)",
+    "type-mapping-read": "boolean-real-fractional-misread (wrong rows, read)",
+    "metadata-passthrough": "unicode-case-collision-wrong-table (wrong table)",
+    "dml-write": "NONE (clean)",
+    "concurrency-transactions": "leftover-temp-table-on-locked-insert (wrong schema state; borderline/likely out-of-scope)"
+  }
 }
