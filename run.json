@@ -1,0 +1,79 @@
+{
+  "run_id": "sqlite-20261008-1731",
+  "connector": "sqlite",
+  "pr": "yflin92/trino#1",
+  "pr_branch": "cs_mplujSNDv3/sqlite-connector",
+  "pr_head_sha": "7ce55e6b32342d27fec58c7009f85abb1b0c6fe6",
+  "image_tag": "trinodb/trino:483",
+  "trino_version": "483",
+  "sqlite_jdbc_version": "3.53.4.0",
+  "sqlite_version_driver_bundled": "3.53.4",
+  "sqlite_version_native_python3": "3.45.1",
+  "sqlite_version_native_cli": "3.45.1",
+  "plugin_dir": "/agentfs/shared/trino-fleet/sqlite-20261008-1731/plugin/trino-sqlite-483",
+  "run_dir": "/agentfs/shared/trino-fleet/sqlite-20261008-1731",
+  "build": {
+    "jdk": "jdk-25",
+    "command": "JAVA_HOME=/usr/local/java/jdk-25 mvn -B package -Dmaven.test.skip=true -Dair.check.skip-all=true",
+    "pom_edits": [
+      "parent trino-root version 484-SNAPSHOT -> 483, relativePath set to empty",
+      "io.airlift:guice -> com.google.inject:guice with <classifier>classes</classifier>"
+    ],
+    "result": "BUILD SUCCESS",
+    "built_at": "2026-10-08T17:34:30Z"
+  },
+  "smoke_test": {
+    "show_schemas": "returns information_schema, main",
+    "create_insert_select_roundtrip": "OK",
+    "filter_pushdown_explain": "pushdown ON -> TableScan[constraint on [id]]; OFF -> ScanFilter[filterPredicate]",
+    "query_table_function": "OK (returns sqlite_version 3.53.4)",
+    "status": "PASS"
+  },
+  "docker_setup": {
+    "note": "overlay2 unsupported on virtiofs root; data-root must be on tmpfs",
+    "dockerd_cmd": "sudo dockerd --config-file /dev/null --storage-driver=overlay2 --data-root=/mnt/docker-tmpfs --group docker",
+    "tmpfs_mount": "sudo mount -t tmpfs -o size=5G tmpfs /mnt/docker-tmpfs"
+  },
+  "default_session_properties": {
+    "write_parallelism": "1",
+    "topn_pushdown_enabled": "true",
+    "aggregation_pushdown_enabled": "true",
+    "join_pushdown_enabled": "false",
+    "unsupported_type_handling": "IGNORE",
+    "domain_compaction_threshold": "256"
+  },
+  "status": "hunters-running (git channel)",
+  "parent_task_id": "875e5b37fa222f127c081367",
+  "areas": {
+    "filter": {
+      "session_id": "cs_pzvkHSyCNa",
+      "status": "spawned"
+    },
+    "topn-limit": {
+      "session_id": "cs__R66Y1doWP",
+      "status": "spawned"
+    },
+    "type-mapping-read": {
+      "session_id": "cs_Kgwvo4CXOy",
+      "status": "spawned"
+    },
+    "dml-write": {
+      "session_id": "cs_OqjT6x0A-k",
+      "status": "spawned"
+    },
+    "metadata-passthrough": {
+      "session_id": "cs_85agneJHzp",
+      "status": "spawned"
+    },
+    "concurrency-transactions": {
+      "session_id": "cs_cAmGj63pSD",
+      "status": "spawned"
+    }
+  },
+  "triage_session_id": null,
+  "channel": "git-branch (yflin92/trino); /agentfs is NOT shared across sessions",
+  "control_branch": "fleet/sqlite-20261008-1731/control",
+  "findings_branch_pattern": "fleet/sqlite-20261008-1731/findings/<area>",
+  "plugin_delivery": "hunters build locally via env-setup.sh build_plugin (~30s); control branch does NOT carry the binary",
+  "run_dir_note": "local-only per session; not shared"
+}
