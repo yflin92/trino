@@ -1,0 +1,4 @@
+native sqlite3 (python3): 3.45.1
+driver bundled engine: "3.53.4"
+Trino image: trinodb/trino:483
+PR SHA: 7ce55e6b32342d27fec58c7009f85abb1b0c6fe6

@@ -1,0 +1,40 @@
+metadata-passthrough hunter — run sqlite-20261008-1731 — outcomes
+
+Target: PR yflin92/trino#1 @ 7ce55e6b32342d27fec58c7009f85abb1b0c6fe6, plugin for trinodb/trino:483.
+Plugin built locally OK. native sqlite3=3.45.1, driver=3.53.4.
+
+CONFIRMED FINDINGS (1):
+- unicode-case-collision-wrong-table: two SQLite tables distinct only by a
+  non-ASCII case pair (KÖLN vs köln) collide to one Trino identifier. Trino
+  lowercases with Unicode rules; getTables matches with ASCII-only COLLATE
+  NOCASE. Result: SHOW TABLES / information_schema list only ONE table (the
+  other is unreachable), and SELECT * FROM "KÖLN" silently returns köln's rows.
+  WRONG TABLE + silent metadata data-loss. Deterministic 3/3.
+
+SEED VERDICTS:
+- Case-insensitive table/column resolution: ASCII "T"/"t" and "A"/"a" collisions
+  are a FALSE PREMISE (SQLite itself rejects them). The constructible, real bug
+  is the Unicode variant above (FILED). Single mixed-case names resolve fine.
+- Quoted names / spaces / dots / unicode: mixed-case resolves fine; Unicode
+  case-collision is the filed bug.
+- Hidden sqlite_* excluded correctly; user table named "sqlite" (6 chars)
+  correctly included; views + quoted names resolve correctly. No bug.
+- query() passthrough SAFETY: claim HOLDS in practice — bare INSERT/CREATE/
+  writing-PRAGMA fail at metadata probe; "...;..." trailing statements rejected
+  (syntax error); INSERT/UPDATE/DELETE...RETURNING pass the probe but fail at
+  execution because the fetch wraps the query as FROM (<q>) o. No write ever
+  landed (md5 + row counts unchanged). BUT the connection is actually READ-WRITE
+  (getConnection override drops setReadOnly(true)); safety rests solely on
+  subquery-wrapping. Documented as LATENT RISK in NOTES.md (not a confirmed
+  wrong-rows/write bug).
+- query() returns same rows as table scan; computed columns -> VARCHAR with
+  correct values; comments inside query work. No bug.
+- getColumns: cid ordering + NULLABLE from notnull consistent; no type
+  mis-report found.
+
+OUT OF SCOPE (errors, noted in NOTES.md only):
+- SELECT * over a table with two Unicode-case-colliding columns -> "Multiple
+  entries with same key" error.
+- PRAGMA read via query() -> wrapping causes "no such table: PRAGMA".
+
+Deliverable: this findings/ dir pushed to the findings branch.

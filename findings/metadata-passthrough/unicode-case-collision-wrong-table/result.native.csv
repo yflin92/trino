@@ -1,0 +1,7 @@
+-- tables (ORDER BY name):
+('KÖLN',)
+('köln',)
+-- KÖLN:
+(1, 'UPPER-umlaut')
+-- köln:
+(2, 'lower-umlaut')
