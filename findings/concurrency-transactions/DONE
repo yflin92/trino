@@ -1,0 +1,18 @@
+concurrency-transactions hunter — run sqlite-20261008-1731 — COMPLETE
+
+1 finding pushed: leftover-temp-table-on-locked-insert
+  A transactional INSERT that fails with SQLITE_BUSY while a native writer holds the
+  file lock long enough (>~6s) leaves an orphan tmp_trino_* staging table permanently
+  in the schema (visible in SHOW TABLES). Reproduced 3/3 at 8s hold, 0/3 at 4s (control).
+  Wrong persistent schema state; no data rows lost/duplicated into the target.
+
+Seed-hypothesis verdicts (detail in NOTES.md):
+  1. write_parallelism>1 (4,8) INSERT/CTAS .......... CLEAN (no lost/dup rows; 8 repeats)
+  2. two/three concurrent Trino INSERTs ............. CLEAN (loser fails cleanly; invariant holds 10/10)
+  3. reads during a write ........................... no issue found (temp-table isolation)
+  4. failed INSERT part-way (cast/date) ............. CLEAN w/o lock; full rollback, no partial/leftover
+  5. START TRANSACTION / ROLLBACK ................... N/A — connector rejects non-autocommit writes
+  6. native EXCLUSIVE lock vs Trino write ........... no silent data loss (clean BUSY); triggers finding #1
+
+Out of scope (NOTES.md): SQLITE_BUSY lock-timeout errors; UPDATE unsupported (functionality gap).
+Could not reproduce: committed-but-reported-failed INSERT; rows stranded in leftover temp (finish window sub-ms).

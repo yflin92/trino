@@ -1,0 +1,31 @@
+SHOW TABLES before:
+"Table"
+"big"
+"c1"
+"m"
+"t"
+"t2"
+"t3"
+
+INSERT (while native holds EXCLUSIVE lock 8s):
+Query 20261008_184150_00200_t3b7e failed: [SQLITE_BUSY] The database file is locked (database is locked)
+
+
+SHOW TABLES after (note orphan tmp_trino_*):
+"Table"
+"big"
+"c1"
+"m"
+"t"
+"t2"
+"t3"
+"tmp_trino_a755c15a_ce92198c"
+
+native sqlite_schema after:
+('table', 't')
+('table', 'm')
+('table', 't2')
+('table', 't3')
+('table', 'c1')
+('table', 'big')
+('table', 'tmp_trino_a755c15a_ce92198c')

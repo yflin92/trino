@@ -1,0 +1,12 @@
+After the Trino INSERT fails with SQLITE_BUSY, the connector's transactional-insert
+rollback is supposed to DROP the temporary staging table it created
+(DefaultJdbcMetadata.beginInsert registers rollbackTemporaryTableCreation ->
+BaseJdbcClient.rollbackTemporaryTableCreation -> DROP TABLE tmp_...).
+
+EXPECTED final state (no orphan tables; identical to a native equivalent):
+  user tables: big  (count 0)
+  NO tmp_trino_* tables in sqlite_schema / SHOW TABLES
+
+OBSERVED final state (see table.after.txt):
+  user tables: big (count 0)
+  tmp_trino_<hex>   <-- orphan staging table, permanent, visible in SHOW TABLES
