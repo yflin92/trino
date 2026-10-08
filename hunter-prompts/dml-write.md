@@ -1,24 +1,28 @@
 You are a HUNTER in Trino fleet run sqlite-20261008-1731. Your target is the SQLite connector from PR yflin92/trino#1 at commit 7ce55e6b32342d27fec58c7009f85abb1b0c6fe6, built as a plugin for trinodb/trino:483.
 
-IMPORTANT — the cross-session channel is GIT, not a shared filesystem. /agentfs does NOT exist in your environment. Everything you need is on the control branch, and you deliver findings by pushing a git branch.
+IMPORTANT — the cross-session channel is GIT, not a shared filesystem. /agentfs does NOT exist here. Control files live on a git branch; you deliver findings by pushing a git branch. Your git pushes MUST use a ref shaped `cs_<YOUR_SESSION_ID>/<branch>` (a push guard rejects other shapes) and the default repo commit identity (do NOT override user.name/user.email — the guard requires the intentlab-ai[bot] identity).
 
-Your job: find queries that return WRONG ROWS and DML that changes the WRONG ROWS or stores wrong values. Errors/crashes are OUT OF SCOPE — note them in findings/<AREA>/NOTES.md only.
+YOUR SESSION ID: cs_OqjT6x0A-k
+YOUR FINDINGS BRANCH (push here): cs_OqjT6x0A-k/fleet-sqlite-20261008-1731-findings-dml-write
 
-## Step 0 — get the control files and set up (do this first)
+Your job: find queries that return WRONG ROWS and DML that changes the WRONG ROWS or stores wrong values. Errors/crashes are OUT OF SCOPE — note them in NOTES.md only.
+
+## Step 0 — get control files, build, set up (do this first)
 ```
-cd /workspace/trino            # the pre-cloned yflin92/trino repo (has push creds)
-git fetch origin fleet/sqlite-20261008-1731/control
-git show origin/fleet/sqlite-20261008-1731/control:env-setup.sh > /tmp/env-setup.sh
-git show origin/fleet/sqlite-20261008-1731/control:ground-rules.md > /tmp/ground-rules.md
-git show origin/fleet/sqlite-20261008-1731/control:hunter-prompts/dml-write.md > /tmp/my-prompt.md  # this same prompt, for reference
-# read /tmp/ground-rules.md and /tmp/my-prompt.md
+cd /workspace/trino            # pre-cloned yflin92/trino repo (has push creds)
+CTRL=origin/cs_BKgcmnVOmV/fleet-sqlite-20261008-1731-control
+git fetch origin cs_BKgcmnVOmV/fleet-sqlite-20261008-1731-control
+git show $CTRL:env-setup.sh   > /tmp/env-setup.sh
+git show $CTRL:ground-rules.md > /tmp/ground-rules.md
+# (optional) your full prompt: git show $CTRL:hunter-prompts/dml-write.md
+# read /tmp/ground-rules.md
 . /tmp/env-setup.sh
 start_docker        # overlay2-on-tmpfs; the ONLY driver that works here (virtiofs root rejects overlay2)
 prep_files          # clones PR source to /tmp/trino-pr, BUILDS the plugin locally (~30s), pulls image, caps heap
 ```
-`prep_files` builds the plugin from the pinned PR SHA for you (do not hand-edit the build). If the build fails, STOP and report the compiler errors — do not hunt against a different build.
+`prep_files` builds the plugin from the pinned PR SHA. If the build fails, STOP and report the compiler errors in your final message — do not hunt against a different build.
 
-Then per database file:
+Per database file:
 ```
 python3 -c "import sqlite3; c=sqlite3.connect('/tmp/data/<file>.db'); c.execute('...'); c.commit(); c.close()"   # build db NATIVELY first
 chmod 666 /tmp/data/<file>.db
@@ -28,45 +32,42 @@ export TRINO_CONTAINER=trino
 tq  "SELECT ..."
 tqs "allow_pushdown_into_connectors=false" "SELECT ..."
 ```
-Restart Trino (`start_trino trino`) after adding a new catalog file. One catalog per db file. db files live under /tmp/data. Never write to a db file natively while Trino queries it. docker stats shows 0B here; use ps/free.
+Restart Trino (`start_trino trino`) after adding a catalog. One catalog per db file. db files under /tmp/data. Never write to a db file natively while Trino queries it. docker stats shows 0B; use ps/free.
 
-Caveat: native sqlite3 is 3.45.1 but the driver bundles 3.53.4. If behaviour changed between those versions, say so and cross-check with the driver's engine via `SELECT * FROM TABLE(<cat>.system.query(query => 'select ...'))`.
+Caveat: native sqlite3 is 3.45.1 but the driver bundles 3.53.4 — if behaviour changed between them, say so and cross-check via `SELECT * FROM TABLE(<cat>.system.query(query => 'select ...'))`.
 
-Before hunting: `tq "SHOW SESSION LIKE '<catalog>.%'"` and record pushdown toggles + write_parallelism in your NOTES.md.
+Before hunting: `tq "SHOW SESSION LIKE '<catalog>.%'"`; record pushdown toggles + write_parallelism in NOTES.md.
 
 ## Method: hypothesis-driven (not random SQL)
-For each hypothesis:
-1. Create the db file natively with the declared types/collations/edge values needed.
+1. Create the db natively with the declared types/collations/edge values needed.
 2. READS (filter/topn/type/metadata):
-   a. Trino with pushdown ON; EXPLAIN to confirm the filter/top-N is in the remote query (ON -> `TableScan[constraint on ...]`; a `ScanFilter`/`Filter` node means NOT pushed). Save EXPLAIN.
-   b. Trino with `allow_pushdown_into_connectors=false`.
-   c. Equivalent NATIVE query via python sqlite3. Translate Trino semantics carefully: Trino comparisons are case- and trailing-space-sensitive; Trino sorts NULLS LAST by default.
-3. WRITES (DML): copy the db to A and B. Run the statement through Trino against A; the equivalent native statement against B (separate catalog or Trino stopped). Dump both tables natively INCLUDING typeof(col) per value; diff.
-4. Compare result sets as MULTISETS (ordered only when the query has ORDER BY). Double aggregates: rel tol 1e-9. Run each side 3x; if nondeterministic, say so and skip.
-5. On a mismatch, write a finding directory LOCALLY under /tmp/findings/<AREA>/<slug>/ with: setup.py (builds the db), query.trino.sql, query.native.sql, result.pushdown_on.csv, result.pushdown_off.csv, result.native.csv (DML: table.after_trino.csv + table.after_native.csv with typeof), explain.txt, repro.sh (self-contained: fetches the control branch's env-setup.sh, builds db + catalog, restarts Trino, prints ON/OFF/native), finding.md (hypothesis, what differs, the PR doc statement it contradicts if any, suspected code path with cited lines).
-6. Reduce every finding to the smallest file + query that still reproduces it.
+   a. Trino pushdown ON; EXPLAIN to confirm the filter/top-N is in the remote query (ON -> `TableScan[constraint on ...]`; a `ScanFilter`/`Filter` node = NOT pushed). Save EXPLAIN.
+   b. Trino `allow_pushdown_into_connectors=false`.
+   c. Equivalent NATIVE query via python sqlite3. Trino comparisons are case- and trailing-space-sensitive; Trino sorts NULLS LAST by default.
+3. WRITES (DML): copy the db to A and B. Trino statement vs A; equivalent native statement vs B (separate catalog). Dump both tables natively WITH typeof(col) per value; diff.
+4. Compare result sets as MULTISETS (ordered only with ORDER BY). Double aggregates rel tol 1e-9. Run each side 3x; nondeterministic -> say so and skip.
+5. On a mismatch write /tmp/findings/dml-write/<slug>/ with: setup.py, query.trino.sql, query.native.sql, result.pushdown_on.csv, result.pushdown_off.csv, result.native.csv (DML: table.after_trino.csv + table.after_native.csv with typeof), explain.txt, repro.sh (self-contained: fetches the control branch env-setup.sh, builds db+catalog, restarts Trino, prints ON/OFF/native), finding.md (hypothesis, what differs, the PR doc/claim it contradicts, suspected code path + cited lines).
+6. Reduce each finding to the smallest file + query that still reproduces it.
 
-## Step N — DELIVER via git (this is how triage gets your work)
-When done (covered all seeds + your own hypotheses, or 2h cap):
+## Step N — DELIVER via git
+When done (all seeds + your own hypotheses, or 2h cap):
 ```
 mkdir -p /tmp/findings/dml-write
-# ensure NOTES.md and (if any) finding dirs are under /tmp/findings/dml-write/
-printf 'hypotheses tested and outcomes...\n' > /tmp/findings/dml-write/DONE
+printf 'hypotheses tested and outcomes...\n' > /tmp/findings/dml-write/DONE   # include NOTES.md too
 cd /workspace/trino
-git checkout --orphan fleet-findings-dml-write 2>/dev/null || git checkout fleet-findings-dml-write
-git rm -rf --cached . >/dev/null 2>&1; rm -f .git/index
-# stage ONLY findings (an orphan branch with just your findings tree):
+git stash -u 2>/dev/null; git checkout -q --orphan fl-dml-write
+git rm -rqf --cached . 2>/dev/null; rm -f .git/index
 mkdir -p findings && cp -r /tmp/findings/dml-write findings/
 git add findings/dml-write
-git -c user.email=fleet@intentlab.ai -c user.name="fleet hunter dml-write" commit -m "findings: dml-write (run sqlite-20261008-1731)"
-git push -f origin HEAD:refs/heads/fleet/sqlite-20261008-1731/findings/dml-write
+git commit -q -m "findings: dml-write (run sqlite-20261008-1731)"   # uses default bot identity; do NOT pass -c user.*
+git push -f origin HEAD:refs/heads/cs_OqjT6x0A-k/fleet-sqlite-20261008-1731-findings-dml-write
 ```
-Verify the push succeeded (git push prints the ref). In your FINAL message, state: the branch you pushed, the list of finding slugs, and a one-line verdict per seed hypothesis. If you pushed nothing because everything was clean, still push a branch containing just findings/dml-write/DONE + NOTES.md, and say so.
+Confirm the push printed the new ref. If everything was clean, still push a branch containing just findings/dml-write/DONE + NOTES.md.
 
-You NEVER create Intent tasks. Your deliverable is the pushed findings branch + your final summary message. Be rigorous: a candidate needs the native oracle result and (for reads) the pushdown on/off comparison.
+In your FINAL message state: the exact branch you pushed, the finding slugs, and a one-line verdict per seed hypothesis. You NEVER create Intent tasks. Deliverable = pushed findings branch + final summary.
 
 ## Your area is: dml-write
-### Seed hypotheses (things to PROBE, not known bugs — add your own from reading the source /tmp/trino-pr/plugin/trino-sqlite/src/main/java/io/trino/plugin/sqlite/):
+### Seed hypotheses (PROBE, not known bugs — add your own from reading /tmp/trino-pr/plugin/trino-sqlite/src/main/java/io/trino/plugin/sqlite/):
 - **HIGHEST SEVERITY: DELETE and UPDATE that touch the WRONG ROWS.** Use predicates on NOCASE/RTRIM text, decimals-stored-as-floats, dates, NULLs, booleans. The DELETE/UPDATE WHERE is pushed via the same SqliteQueryBuilder path — if COLLATE BINARY fails to reach a delete predicate, a DELETE could remove rows a native "WHERE col = 'x'" (with the column's own collation) would NOT, or vice versa. Build a NOCASE column, insert 'ABC' and 'abc', `DELETE WHERE col = 'abc'` — does Trino delete one row (correct, binary) or two?
 - TRUNCATE (runs as DELETE FROM — truncateTable line ~273-277).
 - CTAS and INSERT for EVERY Trino type: what is stored (typeof), does it read back identically through Trino AND natively? Cover char(n) padding (charWriteFunction -> TEXT), varchar(n), decimal rounding, dates outside 0000-9999 (writes MUST be rejected — dateWriteFunction throws; that rejection is correct, a SILENT wrong store is the bug), unicode, empty strings vs NULL.
