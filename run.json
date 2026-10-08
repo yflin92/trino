@@ -42,32 +42,44 @@
     "unsupported_type_handling": "IGNORE",
     "domain_compaction_threshold": "256"
   },
-  "status": "hunters-running (git channel)",
+  "status": "hunters-running (git channel, non-ephemeral, respawned)",
   "parent_task_id": "875e5b37fa222f127c081367",
   "areas": {
     "filter": {
-      "session_id": "cs_pzvkHSyCNa",
-      "status": "spawned"
+      "session_id": "cs_LWoPgj_O4I",
+      "status": "spawned-git-channel",
+      "dead_ephemeral_session": "cs_pzvkHSyCNa",
+      "findings_branch": "cs_LWoPgj_O4I/fleet-sqlite-20261008-1731-findings-filter"
     },
     "topn-limit": {
-      "session_id": "cs__R66Y1doWP",
-      "status": "spawned"
+      "session_id": "cs_XbD4mb8lBB",
+      "status": "spawned-git-channel",
+      "dead_ephemeral_session": "cs__R66Y1doWP",
+      "findings_branch": "cs_XbD4mb8lBB/fleet-sqlite-20261008-1731-findings-topn-limit"
     },
     "type-mapping-read": {
-      "session_id": "cs_Kgwvo4CXOy",
-      "status": "spawned"
+      "session_id": "cs_ifcWbz4SDA",
+      "status": "spawned-git-channel",
+      "dead_ephemeral_session": "cs_Kgwvo4CXOy",
+      "findings_branch": "cs_ifcWbz4SDA/fleet-sqlite-20261008-1731-findings-type-mapping-read"
     },
     "dml-write": {
-      "session_id": "cs_OqjT6x0A-k",
-      "status": "spawned"
+      "session_id": "cs_33rTg0lj_r",
+      "status": "spawned-git-channel",
+      "dead_ephemeral_session": "cs_OqjT6x0A-k",
+      "findings_branch": "cs_33rTg0lj_r/fleet-sqlite-20261008-1731-findings-dml-write"
     },
     "metadata-passthrough": {
-      "session_id": "cs_85agneJHzp",
-      "status": "spawned"
+      "session_id": "cs_lcgHi6H_JM",
+      "status": "spawned-git-channel",
+      "dead_ephemeral_session": "cs_85agneJHzp",
+      "findings_branch": "cs_lcgHi6H_JM/fleet-sqlite-20261008-1731-findings-metadata-passthrough"
     },
     "concurrency-transactions": {
-      "session_id": "cs_cAmGj63pSD",
-      "status": "spawned"
+      "session_id": "cs_2Rx8KFE7F4",
+      "status": "spawned-git-channel",
+      "dead_ephemeral_session": "cs_cAmGj63pSD",
+      "findings_branch": "cs_2Rx8KFE7F4/fleet-sqlite-20261008-1731-findings-concurrency-transactions"
     }
   },
   "triage_session_id": null,
@@ -75,5 +87,6 @@
   "control_branch": "fleet/sqlite-20261008-1731/control",
   "findings_branch_pattern": "fleet/sqlite-20261008-1731/findings/<area>",
   "plugin_delivery": "hunters build locally via env-setup.sh build_plugin (~30s); control branch does NOT carry the binary",
-  "run_dir_note": "local-only per session; not shared"
+  "run_dir_note": "local-only per session; not shared",
+  "coordinator_session_id": "cs_BKgcmnVOmV"
 }
