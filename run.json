@@ -42,7 +42,7 @@
     "unsupported_type_handling": "IGNORE",
     "domain_compaction_threshold": "256"
   },
-  "status": "triage (all 6 hunter branches delivered)",
+  "status": "complete",
   "parent_task_id": "875e5b37fa222f127c081367",
   "areas": {
     "filter": {
@@ -109,5 +109,35 @@
     "metadata-passthrough": "unicode-case-collision-wrong-table (wrong table)",
     "dml-write": "NONE (clean)",
     "concurrency-transactions": "leftover-temp-table-on-locked-insert (wrong schema state; borderline/likely out-of-scope)"
+  },
+  "triage_summary_branch": "cs_yBHttdXmo0/fleet-sqlite-20261008-1731-triage-summary",
+  "parent_task_status": "completed",
+  "result": {
+    "candidates_reproduced": 5,
+    "candidates_dropped": 0,
+    "tasks_created": 3,
+    "tasks": [
+      {
+        "id": "f201c44c53b498ef1891a47c",
+        "title": "[sqlite][filter,type-mapping] BOOLEAN column mapping mishandles non-0/1 stored values",
+        "priority": "high"
+      },
+      {
+        "id": "c57e3014ae7a5d088b20a896",
+        "title": "[sqlite][topn-limit] Top-N pushdown wrong row for INTEGER-affinity off-affinity text",
+        "priority": "high"
+      },
+      {
+        "id": "6a00ea78cb5f62dca02a708d",
+        "title": "[sqlite][metadata-passthrough] Unicode case-collision wrong table",
+        "priority": "high"
+      }
+    ],
+    "out_of_scope": [
+      "concurrency leftover-temp-table-on-locked-insert"
+    ],
+    "clean_areas": [
+      "dml-write"
+    ]
   }
 }
