@@ -1,0 +1,15 @@
+"Query Plan"
+"Trino version: 483
+Fragment 0 [SOURCE]
+    Output layout: [id, v]
+    Output partitioning: SINGLE []
+    Output[columnNames = [id, v]]
+    │   Layout: [id:bigint, v:bigint]
+    │   Estimates: {rows: 1 (18B), cpu: 0, memory: 0B, network: 0B}
+    └─ TableScan[table = mini:main.t main.t sortOrder=[v:bigint:INTEGER ASC NULLS LAST] limit=1]
+           Layout: [id:bigint, v:bigint]
+           Estimates: {rows: 1 (18B), cpu: 18, memory: 0B, network: 0B}
+           id := id:bigint:INTEGER
+           v := v:bigint:INTEGER
+
+"

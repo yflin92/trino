@@ -1,0 +1,20 @@
+topn-limit hunt complete — run sqlite-20261008-1731
+
+Seed hypotheses tested and outcomes:
+1. NULL ordering ASC/DESC x NULLS FIRST/LAST (INTEGER & TEXT) ............ CORRECT
+2. COLLATE BINARY over NOCASE / RTRIM columns .......................... CORRECT
+3. supportsTopN=false for ANY / forced-varchar (NUMERIC/typeless/DATETIME) CORRECT (not pushed)
+4. -0.0/0.0 and float-stored decimals ................................. CORRECT
+5. Date text ordering (leading zeros, 0001..9999) ..................... CORRECT
+6. Storage-class ordering (numbers before text) ....................... WRONG ROWS -> finding
+7. Multi-column top-N, mixed text+int, secondary NULLS FIRST .......... CORRECT
+8. OFFSET + LIMIT ..................................................... CORRECT
+9. Unicode UTF-8 byte ordering ....................................... CORRECT
+
+Findings:
+- topn-integer-affinity-text-value : ORDER BY v ASC LIMIT 1 on an INTEGER-affinity
+  column holding a non-numeric text value returns the WRONG row with pushdown ON
+  (id=1 v=5) vs OFF (id=2 v=0); Trino reads the text cell as 0 in both modes, so
+  the pushed ORDER BY (SQLite storage-class order) contradicts isTopNGuaranteed=true.
+
+Errors/crashes (out of scope): none observed.
