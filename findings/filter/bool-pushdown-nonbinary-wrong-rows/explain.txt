@@ -1,0 +1,14 @@
+"Query Plan"
+"Trino version: 483
+Fragment 0 [SOURCE]
+    Output layout: [id]
+    Output partitioning: SINGLE []
+    Output[columnNames = [id]]
+    │   Layout: [id:bigint]
+    │   Estimates: {rows: ? (?), cpu: 0, memory: 0B, network: 0B}
+    └─ TableScan[table = boolbug:main.t main.t constraint on [flag] columns=[id:bigint:INTEGER]]
+           Layout: [id:bigint]
+           Estimates: {rows: ? (?), cpu: ?, memory: 0B, network: 0B}
+           id := id:bigint:INTEGER
+
+"

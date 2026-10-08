@@ -1,0 +1,19 @@
+Filter-area hunt complete (run sqlite-20261008-1731, area=filter).
+
+DELIVERED FINDING (wrong rows):
+- bool-pushdown-nonbinary-wrong-rows: BOOLEAN column with non-0/1 stored value
+  (int 2/-1 or text 'true') projects as true/false but pushed-down `flag=true`
+  sends `flag=1`, giving different rows ON vs OFF; ON contradicts projection.
+
+SEED VERDICTS (one line each):
+- COLLATE BINARY completeness: HOLDS (=, <>, IN, NOT IN, BETWEEN, ranges,
+  IS DISTINCT FROM, mixed range+IN, IN/NOT IN with NULL on NOCASE & RTRIM all
+  binary + pushed; column-vs-column NOT pushed so no leak).
+- DATE_PUSHDOWN window: in-window correct & pushed; out-of-window literal disables
+  pushdown. Span-only check has a latent hole (unbounded-both-sides domains leak an
+  out-of-window bound) but it ERRORS, not wrong rows -> OUT OF SCOPE, see NOTES.md.
+- doubles (-0.0/0.0, +/-Inf): consistent. OK.
+- bigint > 2^53: exact integer affinity, consistent. OK.
+- decimal(p,s) as float (0.1/0.3/1e8): equality consistent ON/OFF. OK.
+- booleans as 2/-1/'true': WRONG ROWS -> the delivered finding.
+- integer/real affinity: consistent. OK.
